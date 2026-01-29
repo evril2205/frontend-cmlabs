@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { jwtDecode } from "jwt-decode";
 import LeadActive from "@/components/icons/LeadActive";
 import { Globe20Regular } from "@fluentui/react-icons";
 
@@ -17,25 +18,47 @@ import {
 
 import { useSidebar } from "@/contexts/SidebarContext";
 
+interface UserToken {
+  id: number;
+  role: "SUPERADMIN" | "ADMIN" | "SALES";
+}
+
 const Sidebar = () => {
   const pathname = usePathname();
   const { isSidebarOpen } = useSidebar();
+  const [userRole, setUserRole] = useState<string | null>(null);
 
-  const menu = [
-    { label: "Dashboard", href: "/dashboard", defaultIcon: <HomeIcon className="w-5" />, activeIcon: null },
-    { label: "Leads", href: "/leads", defaultIcon: <Globe20Regular className="w-5" />, activeIcon: <LeadActive className="w-5 text-[#3D2C83]" /> },
-    { label: "Team", href: "/team", defaultIcon: <UsersIcon className="w-5" />, activeIcon: null },
-    { label: "Profile", href: "/profile", defaultIcon: <UserIcon className="w-5" />, activeIcon: null },
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode<UserToken>(token);
+        setUserRole(decoded.role);
+      } catch (error) {
+        console.error("Invalid token");
+      }
+    }
+  }, []);
+
+  const allMenus = [
+    { label: "Dashboard", href: "/dashboard", defaultIcon: <HomeIcon className="w-5" />, activeIcon: null, roles: ["SUPERADMIN", "ADMIN", "SALES"] },
+    { label: "Leads", href: "/leads", defaultIcon: <Globe20Regular className="w-5" />, activeIcon: <LeadActive className="w-5 text-[#3D2C83]" />, roles: ["SUPERADMIN", "ADMIN", "SALES"] },
+    { label: "Team", href: "/team", defaultIcon: <UsersIcon className="w-5" />, activeIcon: null, roles: ["SUPERADMIN", "ADMIN"] },
+    { label: "Profile", href: "/profile", defaultIcon: <UserIcon className="w-5" />, activeIcon: null, roles: ["SUPERADMIN", "ADMIN", "SALES"] },
   ];
+
+  // Filter menu berdasarkan role
+  const menu = allMenus.filter((item) => 
+    userRole ? item.roles.includes(userRole) : true
+  );
 
   return (
     <aside
-  className={`fixed left-0 top-0 h-screen bg-[#26214C] text-white
-  flex flex-col justify-between rounded-r-3xl shadow-md
-  transition-all duration-300 z-50
-  ${isSidebarOpen ? "w-50 px-4 py-5" : "w-0 px-0 py-0 overflow-hidden"}`}
->
-
+      className={`fixed left-0 top-0 h-screen bg-[#26214C] text-white
+      flex flex-col justify-between rounded-r-3xl shadow-md
+      transition-all duration-300 z-50
+      ${isSidebarOpen ? "w-50 px-4 py-5" : "w-0 px-0 py-0 overflow-hidden"}`}
+    >
       {/* Logo */}
       <div className={`transition-opacity duration-300 ${isSidebarOpen ? "opacity-100" : "opacity-0"}`}>
         <div className="flex items-center gap-2.5 mb-8">

@@ -272,7 +272,7 @@ const KanbanBoard = React.forwardRef<any, KanbanBoardProps>((props, ref) => {
         </div>
       )}
 
-      <div className="bg-[#F0F2F5] h-full flex flex-col overflow-hidden">
+      <div className="bg-[#F0F2F5] h-[calc(100vh-120px)] flex flex-col overflow-hidden">
         {!isArchiveMode && (
           <div ref={topScrollRef} onScroll={handleTopScroll} className="overflow-x-auto overflow-y-hidden bg-[#F0F2F5]" style={{ height: 12 }}>
             <div style={{ width: `${contentWidth}px`, height: 1 }} />

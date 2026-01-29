@@ -89,16 +89,17 @@ export default function Login() {
       setSuccessMsg("Login success");
 
       setTimeout(() => {
-        if (decoded.role === "ADMIN") {
-          window.location.href =  "/dashboard";
-        } else if (decoded.role === "SALES") {
-          window.location.href = "/profile";
-        }else if (decoded.role === "PROJECT_MANAGER") {
-          window.location.href = "/profile";
-        } else {
-          window.location.href = "/login";
-        }
-      }, 1200);
+  if (decoded.role === "ADMIN" || decoded.role === "SUPERADMIN") {
+    window.location.href = "/dashboard";
+  } else if (decoded.role === "SALES") {
+    window.location.href = "/profile";
+  } else if (decoded.role === "PROJECT_MANAGER") {
+    window.location.href = "/profile";
+  } else {
+    window.location.href = "/login";
+  }
+}, 1200);
+
 
     } catch (err) {
       setErrorMsg("Login failed: Unable to connect to the server.");

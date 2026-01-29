@@ -428,7 +428,7 @@ export default function ModalCreateTeam({
         </div>
 
         <div>
-          <StringSelect
+          <CustomSelect
             label="Department"
             value={form.departmentId}
             onChange={(v) => update("departmentId", v)}

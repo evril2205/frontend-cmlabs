@@ -36,7 +36,7 @@ const KanbanColumn = ({
   onArchiveLead,
 }: KanbanColumnProps) => {
   return (
-    <div className="bg-[#E8EAED] rounded-lg shadow-sm p-2 w-62 flex-shrink-0 min-w-[15rem] h-full flex flex-col">
+   <div className="bg-[#E8EAED] rounded-lg shadow-sm p-2 flex-1 min-w-[280px] h-full flex flex-col">
       {/* Header */}
       <div className="border border-gray-300 rounded-lg p-2 mb-1 bg-white flex items-center justify-between flex-shrink-0">
         <div>
@@ -62,9 +62,9 @@ const KanbanColumn = ({
       <Droppable droppableId={stageId}>
         {(provided, snapshot) => (
           <div
-            className={`space-y-1 pb-4 h-full transition-colors ${
-              snapshot.isDraggingOver ? "bg-gray-300/30" : ""
-            }`}
+            className={`space-y-1 pb-4 flex-1 transition-colors ${
+    snapshot.isDraggingOver ? "bg-gray-300/30" : ""
+  }`}
             ref={provided.innerRef}
             {...provided.droppableProps}
           >

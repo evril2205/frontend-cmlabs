@@ -26,11 +26,31 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
     stage: "",
     label: "",
     contacts: "",
-    teamMember: "", 
+    teamMemberId: "", 
     description: "",
   });
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  useEffect(() => {
+  const fetchTeamMembers = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/users/all", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      const data = await res.json();
+      setTeamMembers(data.users || []);
+    } catch (err) {
+      console.error("Gagal ambil team member", err);
+    }
+  };
+
+  fetchTeamMembers();
+}, []);
+
 
   // MENGATASI ERROR userLogin: Ambil data user dari localStorage saat komponen dimuat
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -52,7 +72,7 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
     if (!open) {
       setFormData({
         title: "", value: "", currency: "IDR", stage: "",
-        label: "", contacts: "", teamMember: "", description: "",
+        label: "", contacts: "", teamMemberId: "", description: "",
       });
       setDueDate(null);
       onClose();
@@ -93,7 +113,7 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
       label: formData.label,
       dueDate: dueDate ? dueDate.toISOString() : new Date().toISOString(),
       description: formData.description || "-",
-      picId: currentUser?.id || 1, 
+      picId: Number(formData.teamMemberId) || currentUser?.id,
       companyName: "-", 
       sourceOrigin: "Web Form",
     } as any;
@@ -159,28 +179,49 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
               />
             </div>
             <CustomSelect
-              label="Currency"
-              value={formData.currency}
-              options={["IDR", "USD", "EUR"]}
-              onChange={(v) => handleChange("currency", v)}
-            />
+  label="Currency"
+  value={formData.currency}
+  options={[
+    { label: "IDR", value: "IDR" },
+    { label: "USD", value: "USD" },
+    { label: "EUR", value: "EUR" },
+  ]}
+  onChange={(v) => handleChange("currency", v)}
+/>
+
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <CustomSelect
-              label="Stage *"
-              value={formData.stage}
-              placeholder="Select Stage"
-              options={["Lead In", "Contact Made", "Need Identified", "Proposal Made", "Negotiation", "Contract Send", "Won", "Lost"]}
-              onChange={(v) => handleChange("stage", v)}
-            />
+  label="Stage"
+  value={formData.stage}
+  placeholder="Select Stage"
+  options={[
+    { label: "Lead In", value: "Lead In" },
+    { label: "Contact Made", value: "Contact Made" },
+    { label: "Need Identified", value: "Need Identified" },
+    { label: "Proposal Made", value: "Proposal Made" },
+    { label: "Negotiation", value: "Negotiation" },
+    { label: "Contract Send", value: "Contract Send" },
+    { label: "Won", value: "Won" },
+    { label: "Lost", value: "Lost" },
+  ]}
+  onChange={(v) => handleChange("stage", v)}
+/>
+
             <CustomSelect
-              label="Label"
-              value={formData.label}
-              placeholder="Label"
-              options={["Cold", "Hot", "Pitching", "Deal"]}
-              onChange={(v) => handleChange("label", v)}
-            />
+  label="Label"
+  value={formData.label}
+  placeholder="Label"
+  options={[
+    { label: "Cold", value: "Cold" },
+    { label: "Hot", value: "Hot" },
+    { label: "Pitching", value: "Pitching" },
+    { label: "Deal", value: "Deal" },
+  ]}
+  onChange={(v) => handleChange("label", v)}
+/>
+
           </div>
 
           <div className="space-y-1">
@@ -196,12 +237,18 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
 
           <div className="space-y-1">
             <CustomSelect
-              label="Team Member"
-              value={formData.teamMember}
-              placeholder="Enter Team Member"
-              options={["William M", "Nur", "Responsible Team"]}
-              onChange={(v) => handleChange("teamMember", v)}
-            />
+  label="Team Member"
+  value={
+    teamMembers.find((u) => u.id === Number(formData.teamMemberId))?.fullname || ""
+  }
+  placeholder="Select Team Member"
+  options={teamMembers.map((u) => ({
+    label: u.fullname,
+    value: String(u.id),
+  }))}
+  onChange={(v) => handleChange("teamMemberId", v)}
+/>
+
           </div>
 
           <div className="space-y-1">
@@ -258,7 +305,7 @@ function CustomSelect({
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: { label: string; value: string }[];
   onChange: (v: string) => void;
   placeholder?: string;
   required?: boolean;
@@ -291,33 +338,33 @@ function CustomSelect({
 
           <div className="absolute z-[70] w-full mt-[54px] bg-white border border-gray-200 rounded-md shadow-lg py-1 overflow-hidden">
             {options.map((opt) => {
-              const isSelected = opt.toLowerCase() === value.toLowerCase();
+  const isSelected = opt.value === value;
 
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt);
-                    setOpen(false);
-                  }}
-                  className={`
-                    group w-full px-3 py-2 text-left text-[11px] flex items-center justify-between transition-colors
-                    hover:bg-[#CCC8E8]
-                    ${isSelected ? "bg-[#CCC8E8]/40 font-semibold text-[#5A4FB5]" : "text-gray-700"}
-                  `}
-                >
-                  <span className="truncate">{opt}</span>
-                  
-                  {/* ICON CHECK: Muncul saat HOVER atau sudah SELECTED */}
-                  <CheckIcon 
-                    className={`w-3.5 h-3.5 text-[#5A4FB5] transition-opacity
-                      ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
-                    `} 
-                  />
-                </button>
-              );
-            })}
+  return (
+    <button
+      key={opt.value}
+      onClick={() => {
+        onChange(opt.value);
+        setOpen(false);
+      }}
+      className={`
+        group w-full px-3 py-2 text-left text-[11px]
+        flex items-center justify-between transition-colors
+        hover:bg-[#CCC8E8]
+        ${isSelected ? "bg-[#CCC8E8]/40 font-semibold text-[#5A4FB5]" : "text-gray-700"}
+      `}
+    >
+      <span className="truncate">{opt.label}</span>
+
+      <CheckIcon
+        className={`w-3.5 h-3.5 text-[#5A4FB5]
+          ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}
+        `}
+      />
+    </button>
+  );
+})}
+
           </div>
         </>
       )}
