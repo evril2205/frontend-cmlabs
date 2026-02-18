@@ -102,7 +102,7 @@ export default function EditLeadSummaryModal({
           <CustomSelect
             label="Stage"
             value={formData.stage}
-            options={["Lead in", "Contact Made", "Need Identified", "Proposal Made", "Negotiation", "Contract Send", "Won", "Lost"]}
+            options={["Lead in", "Contact Made", "Need Identified", "Proposal Made", "Negotiation Started", "Contract Send", "Won", "Lost"]}
             onChange={(v) => setFormData({ ...formData, stage: v })}
           />
         </div>

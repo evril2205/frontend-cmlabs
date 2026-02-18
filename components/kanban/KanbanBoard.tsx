@@ -151,74 +151,27 @@ const KanbanBoard = React.forwardRef<any, KanbanBoardProps>((props, ref) => {
 };
 
 
- const confirmAction = async () => {
+const confirmAction = async () => {
   if (!leadToProcess) return;
-  const numericId = parseInt(leadToProcess);
 
-  // Cek jika ID tidak valid
-  if (isNaN(numericId)) {
-    console.error("ID Lead tidak valid:", leadToProcess);
-    setIsConfirmOpen(false);
-    return;
-  }
-  
-  // 1. UPDATE UI SECARA OPTIMISTIK (Hapus sementara dari layar)
-  if (onLeadsChange && leadsFromProps) {
-    if (onLeadsChange && leadsFromProps) {
-  const targetStage =
-    confirmationType === "won" ? "WON" :
-    confirmationType === "lost" ? "LOST" :
-    null;
-
-  if (targetStage) {
-    const updatedLeads = leadsFromProps.map(l =>
-      l.id === leadToProcess
-        ? { ...l, stage: targetStage }
-        : l
-    );
-
-    onLeadsChange(updatedLeads);
-  }
-}
-
-  }
-
-  try {
-    // 2. JALANKAN PROSES DI BACKEND
+  // Cukup update UI via props, biarkan parent yang panggil API
+  if (onLeadsChange) {
     if (confirmationType === "delete") {
-      await deleteLead(numericId);
-      showToast("Lead Deleted!");
-    } else if (confirmationType === "restore") {
-      await updateLead(numericId, { isArchived: false });
-      showToast("Lead Restored!");
-    } else {
-      // ✅ PASTIKAN: status dikirim dalam UPPERCASE (WON / LOST)
-      const targetStatus = confirmationType.toUpperCase(); 
-      console.log("🔵 Mengirim status:", targetStatus);  // Debug log
-      
-      await updateLeadStatus(numericId, { status: targetStatus });
-      showToast(`Lead marked as ${targetStatus}!`);
+      const updated = leadsFromProps.filter(l => l.id !== leadToProcess);
+      onLeadsChange(updated); // Ini akan memicu handleDeleteLead di LeadsPage
+    } 
+    else if (confirmationType === "won" || confirmationType === "lost") {
+      const targetStatus = confirmationType.toUpperCase();
+      const updated = leadsFromProps.map(l => 
+        l.id === leadToProcess ? { ...l, stage: targetStatus } : l
+      );
+      onLeadsChange(updated);
     }
-
-    // Sinkronisasi data
-    onArchiveSuccess?.(); 
-  } catch (err: any) {
-    console.error("❌ Proses backend gagal:", err);
-    console.error("❌ Error detail:", {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status
-    });
-    
-    // ✅ PERBAIKAN: Pakai kurung biasa, bukan backtick
-    alert(`Gagal memproses: ${err.response?.data?.message || "Terjadi kesalahan server"}`);
-    
-    // ⚠️ PENTING: Jika gagal, paksa refresh agar card yang tadi "dihapus" di UI muncul lagi
-    onArchiveSuccess?.(); 
-  } finally {
-    setIsConfirmOpen(false);
-    setLeadToProcess(null);
+    // ... restore tetap pakai API lokal karena logic-nya beda sendiri
   }
+
+  setIsConfirmOpen(false);
+  setLeadToProcess(null);
 };
 
   const handleTopScroll = () => { if (topScrollRef.current && realScrollRef.current) realScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft; };

@@ -5,6 +5,8 @@ import { Icon } from "@iconify/react";
 import { UserIcon, PhoneIcon, MapPinIcon } from "@heroicons/react/24/outline";
 import { Check } from "lucide-react";
 import Avatar from "../../../components/icons/Avatar";
+import type { JSX } from "react";
+
 
 /* ================= INPUT COMPONENT ================= */
 interface InputProps {
@@ -56,7 +58,7 @@ function CustomSelect({
   options: OptionItem[];
 }) {
   const [open, setOpen] = useState(false);
-
+const [isDirty, setIsDirty] = useState(false);
   const selected = options.find((o) => o.id === value);
 
   const colorMap: Record<string, string> = {
@@ -284,18 +286,26 @@ export default function Profil() {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); 
+  
 
   const updateField = (key: keyof UserForm, value: string | number | null) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setIsDirty(true);
   };
 
   /* ===== LOAD USER ID ===== */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return (window.location.href = "/login");
-    const decoded: any = JSON.parse(atob(token.split(".")[1]));
-    setUserId(decoded.id);
-  }, []);
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    window.location.href = "/login";
+    return;
+  }
+
+  const decoded: any = JSON.parse(atob(token.split(".")[1]));
+  setUserId(decoded.id);
+}, []);
 
   const token = localStorage.getItem("token");
 

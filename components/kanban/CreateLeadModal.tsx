@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BriefcaseIcon, ChevronDownIcon, CheckIcon, CalendarIcon } from "@heroicons/react/24/solid";
+import Avatar from "../icons/Avatar";
 
 interface CreateLeadModalProps {
   isOpen: boolean;
@@ -32,37 +33,59 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  // 2. FETCH DATA TEAM MEMBERS (ASSIGNABLE)
   useEffect(() => {
-  const fetchTeamMembers = async () => {
+  const loadTeamMembers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/users/all", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      // PASTIKAN URL SUDAH BENAR: /users/assignable
+      const res = await fetch("http://localhost:5000/api/profile/assignable", {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  },
       });
 
-      const data = await res.json();
-      setTeamMembers(data.users || []);
+      const result = await res.json();
+      
+      console.log("Data Team Members dari Backend:", result);
+
+      // Backend mengirim objek: { success: true, data: [...] }
+      if (result && result.success && Array.isArray(result.data)) {
+        setTeamMembers(result.data);
+      } else {
+        console.warn("Format data tidak sesuai atau success: false", result);
+      }
     } catch (err) {
-      console.error("Gagal ambil team member", err);
+      console.error("Gagal ambil team member:", err);
     }
   };
 
-  fetchTeamMembers();
-}, []);
-
+  if (isOpen) {
+    loadTeamMembers();
+  }
+}, [isOpen]);
 
   // MENGATASI ERROR userLogin: Ambil data user dari localStorage saat komponen dimuat
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // 3. GET CURRENT USER FROM LOCALSTORAGE
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("user"); // Sesuaikan key 'user' dengan sistem loginmu
+      const storedUser = localStorage.getItem("user");
       if (storedUser) {
-        setCurrentUser(JSON.parse(storedUser));
+        const user = JSON.parse(storedUser);
+        setCurrentUser(user);
+        
+        // Jika user adalah SALES, otomatis set teamMemberId ke ID dia sendiri
+        if (user.role === "SALES") {
+          setFormData(prev => ({ ...prev, teamMemberId: user.id.toString() }));
+        }
       }
     }
-  }, []);
+  }, [isOpen]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -103,20 +126,40 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
       "Lost": "LOST",
     };
 
-    // 3. PREPARE DATA (Pastikan semua field terisi agar tidak NULL)
     const leadData = {
-      title: formData.title,
-      contactPerson: formData.contacts,
-      dealValue: Number(formData.value) || 0,
-      currency: formData.currency || "IDR", // Default IDR jika kosong
-      status: statusMap[formData.stage] || "NEW", // Mapping ke status backend
-      label: formData.label,
-      dueDate: dueDate ? dueDate.toISOString() : new Date().toISOString(),
-      description: formData.description || "-",
-      picId: Number(formData.teamMemberId) || currentUser?.id,
-      companyName: "-", 
-      sourceOrigin: "Web Form",
-    } as any;
+  // 🔹 BASIC
+  title: formData.title,
+  dealValue: Number(formData.value) || 0,
+  currency: formData.currency || "IDR",
+  status: statusMap[formData.stage] || "NEW",
+  label: formData.label,
+  description: formData.description || "-",
+  dueDate: dueDate ? dueDate.toISOString() : new Date().toISOString(),
+
+  // 🔹 PERSON
+  contactPerson: formData.contacts || "-",
+  personName: formData.contacts || "-",
+  personPhone: "-",
+  personEmail: "-",
+  personLabel: "WORK",
+
+  // 🔹 COMPANY
+  companyName: formData.contacts || "-",
+  companyEmail: "-",
+  companyStreet: "-",
+  companyCity: "-",
+  companyState: "-",
+  companyPostalCode: "-",
+  companyCountry: "-",
+
+  // 🔹 SOURCE
+  sourceOrigin: "Web Form",
+  sourceChannel: "Manual",
+
+  // 🔹 RELATION
+  picId: Number(formData.teamMemberId) || currentUser?.id,
+} as any;
+
 
     console.log("Data yang akan dikirim ke DB:", leadData);
 
@@ -236,18 +279,17 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
           </div>
 
           <div className="space-y-1">
-            <CustomSelect
-  label="Team Member"
-  value={
-    teamMembers.find((u) => u.id === Number(formData.teamMemberId))?.fullname || ""
-  }
-  placeholder="Select Team Member"
-  options={teamMembers.map((u) => ({
-    label: u.fullname,
-    value: String(u.id),
-  }))}
-  onChange={(v) => handleChange("teamMemberId", v)}
-/>
+
+  {/* TEAM MEMBER SELECT */}
+          <div className="space-y-1">
+            <TeamMemberSelect
+              value={formData.teamMemberId}
+              onChange={(v: string) => handleChange("teamMemberId", v)}
+              teamMembers={teamMembers}
+              disabled={currentUser?.role === "SALES"}
+              currentUser={currentUser}
+            />
+          </div>
 
           </div>
 
@@ -294,7 +336,70 @@ const CreateLeadModal = ({ isOpen, onClose, onSubmit }: CreateLeadModalProps) =>
   );
 };
 /* ================= CUSTOM SELECT COMPONENT ================= */
+function TeamMemberSelect({ value, onChange, teamMembers, disabled, currentUser }: { value: string; onChange: (v: string) => void; teamMembers: any[]; disabled: boolean; currentUser: any }) {
+  const [open, setOpen] = useState(false);
+  
+  const safeMembers = Array.isArray(teamMembers) ? teamMembers : [];
+  
+  // Cari data member yang sedang dipilih
+  const selected = safeMembers.find(u => u.id.toString() === value.toString()) || 
+                   (disabled ? currentUser : null);
 
+  return (
+    <div className="relative w-full">
+      <label className="block mb-1 text-[10px] font-bold text-gray-500 ml-1">Team Member / PIC</label>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        className={`w-full h-[36px] px-3 border border-gray-200 rounded-sm flex items-center justify-between text-xs transition-all ${
+          disabled ? "bg-gray-50 cursor-not-allowed text-gray-500" : "bg-white hover:border-[#5A4FB5]"
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          {/* PAKAI KOMPONEN AVATAR DI SINI (Trigger Button) */}
+          <Avatar 
+            name={selected?.fullname || "Select"} 
+            src={selected?.profilePicture ? `http://localhost:5000${selected.profilePicture}` : null} 
+            size={22} 
+          />
+          <span className="truncate">{selected?.fullname || "Select Team Member"}</span>
+        </div>
+        {!disabled && <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />}
+      </button>
+
+      {open && !disabled && (
+        <>
+          <div className="fixed inset-0 z-[80]" onClick={() => setOpen(false)} />
+          <div className="absolute z-[90] w-full mt-1 max-h-[200px] overflow-y-auto bg-white border border-gray-200 shadow-xl rounded-md py-1">
+            {safeMembers.map((member) => (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => { onChange(member.id.toString()); setOpen(false); }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-[#F3F2FA] text-left transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {/* PAKAI KOMPONEN AVATAR DI SINI (List Item) */}
+                  <Avatar 
+                    name={member.fullname} 
+                    src={member.profilePicture ? `http://localhost:5000${member.profilePicture}` : null} 
+                    size={28} 
+                  />
+                  <div>
+                    <p className="text-[11px] font-medium text-gray-700">{member.fullname}</p>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-wider">{member.role}</p>
+                  </div>
+                </div>
+                {value.toString() === member.id.toString() && <CheckIcon className="w-3.5 h-3.5 text-[#5A4FB5]" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 function CustomSelect({
   label,
   value,

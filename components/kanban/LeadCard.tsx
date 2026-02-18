@@ -28,11 +28,27 @@ const LeadCard = ({
   onArchive,
 }: LeadCardProps) => {
   // Map warna tag custom
-  const tagColorMap: Record<string, string> = {
-    Hot: "bg-[#F92916]",
-    "High Priority": "bg-[#D1FB20]",
-    Existing: "bg-[#2D8EFF]",
-  };
+  const labelColorMap: Record<string, string> = {
+  // Priority
+  "High Priority": "#D1FB20",
+  "Medium Priority": "#CAA9FF",
+  "Low Priority": "#CCC8E8",
+  // Temperature
+  "Hot": "#F92916",
+  "Cold": "#14D4FF",
+  // Status/Type
+  "Pitching": "#7B72C4",
+  "Deal": "#00A43C",
+  "Existing Client": "#2D8EFF",
+  "New Client": "#24DC68",
+  "Prospect": "#9F5025",
+  "Former Client": "#ACACAC",
+};
+
+const getTagColor = (text: string | undefined) => {
+  if (!text) return "#EAEAEA"; // Warna default kalau kosong
+  return labelColorMap[text] || "#EAEAEA";
+};
 
   return (
     <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200 hover:shadow-md transition-all">
@@ -87,10 +103,10 @@ const LeadCard = ({
           <span
             key={index}
             className={`
-              ${tagColorMap[tag.label] || tag.color}
               text-black text-[8px] font-small 
               px-3 py-[3px] rounded-full whitespace-nowrap
             `}
+            style={{ backgroundColor: getTagColor(tag.label) }}
           >
             {tag.label}
           </span>

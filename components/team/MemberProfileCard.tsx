@@ -7,6 +7,8 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/solid";
 import { Icon } from "@iconify/react";
+import Avatar from "@/components/icons/Avatar";
+import { JSX } from "react";
 
 // Tipe member sesuai backend
 export interface Member {
@@ -15,6 +17,7 @@ export interface Member {
   role?: string;
   email?: string;
   joined_at?: string;
+  profilePicture?: string;
   department?: { id: number; name: string } | null;
   status?: { id: number; name: string } | null;
 }
@@ -52,10 +55,7 @@ export default function MemberProfileCard({ member, onEdit, onDelete }: Props) {
     <div className="w-[321px] bg-white rounded-2xl shadow-md p-6 self-start">
       <div className="flex flex-col items-center gap-2 mt-6">
         {/* Avatar */}
-        <div className="w-16 h-16 rounded-full bg-purple-300 flex items-center justify-center text-white text-xl font-bold">
-          {member.fullname?.[0] || "U"}
-        </div>
-
+       <Avatar name={member.fullname || "User"} size={64} />
         {/* Name & Role */}
         <h2 className="font-semibold text-base mt-2">{member.fullname || "Unknown"}</h2>
         <p className="text-sm font-semibold">{member.role || "—"}</p>

@@ -13,6 +13,9 @@ export enum LeadStatus {
 
 // Interface untuk Lead (sesuai dengan Prisma schema)
 export interface Lead {
+  teamMembers: never[];
+  pipelineStatus: string;
+  pic: any;
   id?: number;
   
   // ==========================================
@@ -78,8 +81,8 @@ export interface CreateLeadRequest {
   
   // Frontend fields
   label?: string;
-  priority?: string;          // ✅ TAMBAHAN
-  clientType?: string;        // ✅ TAMBAHAN
+  priority?: string;       
+  clientType?: string;       
   dueDate?: string;
   description?: string;
   
@@ -105,6 +108,8 @@ export interface CreateLeadRequest {
   // Relations
   picId?: number;
   isArchived?: boolean;
+  pipelineStatus?: string; 
+
 }
 
 // Interface untuk Response dari Backend

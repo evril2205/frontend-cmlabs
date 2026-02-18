@@ -7,7 +7,7 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/solid";
 import { Icon } from "@iconify/react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { JSX, useEffect, useRef, useState } from "react";
 import Topbar from "@/components/topbar/Topbar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { ImageIcon, Mail, Phone, MapPin } from "lucide-react";
@@ -189,7 +189,9 @@ export default function Page() {
   return (
     <div className="flex flex-col">
       {/* TOPBAR */}
-     
+      <div className="bg-[#F0F2F5] px-5 border-b border-gray-200">
+        <Topbar onToggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+      </div>
 
       <div style={{ height: "80px" }} />
 

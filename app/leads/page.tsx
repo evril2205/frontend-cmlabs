@@ -10,9 +10,9 @@ import CreateLeadModal from "@/components/kanban/CreateLeadModal";
 import { useSidebar } from "@/contexts/SidebarContext";
 import LeadManagement from '@/components/leads/LeadManagement';
 import { useRouter, useSearchParams } from "next/navigation";
-import { getLeads, updateLeadStatus, deleteLead } from "@/services/leadService";
-
-
+import { getLeads, updateLeadStatus, deleteLead, addNote, getNotesByLead } from "@/services/leadService";
+import AddNoteModal from "@/components/modals/AddNoteModal";
+import ActivityFeed from "@/components/leads/activities/ActivityFeed";
 
 interface Lead {
   id: string;
@@ -43,13 +43,29 @@ const getInitial = (name: string): string => {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 };
 
-
 export default function LeadsPage() {
   const { isSidebarOpen, toggleSidebar } = useSidebar();
   const [isArchiveMode, setIsArchiveMode] = useState(false);
   const [currentView, setCurrentView] = useState<"list" | "grid" | "kanban" | "archive" | "detail">("kanban");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+const [toastMessage, setToastMessage] = useState("");
+  const boardRef = useRef<any>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const modalParam = searchParams.get("modal");
+
+  const showToast = (message: string) => {
+  setToastMessage(message);
+  setTimeout(() => setToastMessage(""), 3000);
+};
   // ✅ FILTER STATE
   const [filters, setFilters] = useState({
     stages: "",
@@ -84,13 +100,11 @@ export default function LeadsPage() {
       if (filters.currencies && filters.currencies !== "") {
         const leadValueStr = lead.value.toUpperCase();
         const fc = filters.currencies.toUpperCase();
-        
         let match = false;
         if (fc === 'IDR') match = leadValueStr.includes('RP') || leadValueStr.includes('IDR');
         else if (fc === 'USD') match = leadValueStr.includes('$') || leadValueStr.includes('USD');
         else if (fc === 'EUR') match = leadValueStr.includes('€') || leadValueStr.includes('EUR');
         else match = leadValueStr.includes(fc);
-        
         if (!match) return false;
       }
 
@@ -140,41 +154,17 @@ export default function LeadsPage() {
     });
   };
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const boardRef = useRef<any>(null);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
-
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const modalParam = searchParams.get("modal");
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // Sync Modal State dengan URL
-  useEffect(() => {
-    if (modalParam === "add") {
-      setIsCreateModalOpen(true);
-    } else {
-      setIsCreateModalOpen(false);
-    }
-  }, [modalParam]);
-
-  // ✅ FETCH LEADS FROM BACKEND
-  const fetchLeadsData = async () => {
+  // ✅ FUNGSI LOAD DATA (Gabungan dari kode baru)
+  const fetchAllData = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
       console.log('🔄 Fetching leads from backend...');
-      const response = await getLeads();
       
+      const response = await getLeads();
       console.log('📦 Raw response:', response);
 
-      // ✅ FIX TYPESCRIPT ERROR: Explicitly type leadsData
       let leadsData: any[] = [];
-      
       if (response.success && response.data) {
         leadsData = response.data;
       } else if (Array.isArray(response)) {
@@ -189,7 +179,7 @@ export default function LeadsPage() {
         const formatted: Lead[] = leadsData.map((item: any) => {
           const rawStatus = item.status ? item.status.toUpperCase() : "NEW";
           let finalStage = rawStatus;
-          
+
           if (rawStatus === "CONTRACT_SENT" || rawStatus === "DEMO_SCHEDULED") {
             finalStage = "NEGOTIATION";
           }
@@ -200,11 +190,11 @@ export default function LeadsPage() {
             minimumFractionDigits: 0,
           }).format(Number(item.dealValue || 0));
 
-          const formattedDate = item.dueDate 
-            ? new Date(item.dueDate).toLocaleDateString('id-ID', { 
-                day: '2-digit', 
-                month: 'short', 
-                year: 'numeric' 
+          const formattedDate = item.dueDate
+            ? new Date(item.dueDate).toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
               })
             : "-";
 
@@ -216,13 +206,11 @@ export default function LeadsPage() {
             date: formattedDate,
             stage: finalStage,
             isArchived: item.isArchived || false,
-            tags: item.label 
-              ? [{ label: item.label, color: getLabelColor(item.label) }] 
-              : [],
-            assignee: { 
-              name: item.pic?.fullname || "Unassigned", 
-              initial: getInitial(item.pic?.fullname || "U"), 
-              color: "bg-purple-500" 
+            tags: item.label ? [{ label: item.label, color: getLabelColor(item.label) }] : [],
+            assignee: {
+              name: item.pic?.fullname || "Unassigned",
+              initial: getInitial(item.pic?.fullname || "U"),
+              color: "bg-purple-500"
             }
           };
         });
@@ -235,10 +223,17 @@ export default function LeadsPage() {
         setLeads([]);
       }
 
+      // ✅ LOAD NOTES jika ada selectedLeadId
+      if (selectedLeadId) {
+        const numericLeadId = parseInt(selectedLeadId);
+        const notes = await getNotesByLead(numericLeadId);
+        setActivities(notes.data || []);
+      }
+
     } catch (error: any) {
       console.error("❌ Error fetching leads:", error);
       setError("Failed to load leads. Please try again.");
-      
+
       const cachedLeads = localStorage.getItem("kanban_leads_cache");
       if (cachedLeads) {
         try {
@@ -252,18 +247,24 @@ export default function LeadsPage() {
     }
   };
 
+  // Sync Modal State dengan URL
+  useEffect(() => {
+    if (modalParam === "add") {
+      setIsCreateModalOpen(true);
+    } else {
+      setIsCreateModalOpen(false);
+    }
+  }, [modalParam]);
+
   // ✅ INITIAL LOAD: Restore view mode & fetch data
   useEffect(() => {
-    fetchLeadsData();
-    
-    // Restore saved view mode
+    fetchAllData();
+
     const savedView = localStorage.getItem("kanban_view");
     if (savedView) {
-      try { 
+      try {
         const parsedView = JSON.parse(savedView);
         setCurrentView(parsedView);
-        
-        // If saved view is "archive", set archive mode
         if (parsedView === "archive") {
           setIsArchiveMode(true);
         }
@@ -273,14 +274,40 @@ export default function LeadsPage() {
     }
   }, []);
 
+  // Re-fetch saat selectedLeadId berubah
+  useEffect(() => {
+    if (selectedLeadId) {
+      fetchAllData();
+    }
+  }, [selectedLeadId]);
+
   // ✅ SAVE VIEW MODE on change
   useEffect(() => {
     localStorage.setItem("kanban_view", JSON.stringify(currentView));
   }, [currentView]);
 
+  // ✅ HANDLE SAVE NOTE (dari kode baru)
+  const handleSaveNote = async (data: any) => {
+    if (!selectedLeadId) return;
+    
+    try {
+      const numericLeadId = parseInt(selectedLeadId);
+      await addNote(numericLeadId, { 
+        title: data.title, 
+        content: data.content 
+      });
+      
+      fetchAllData(); // Refresh semua data
+      setModalOpen(false);
+    } catch (err) {
+      console.error("Failed to save note:", err);
+      alert("Failed to save note");
+    }
+  };
+
   // ✅ CREATE LEAD - Refresh after success
   const handleCreateLeadSubmit = async () => {
-    await fetchLeadsData();
+    await fetchAllData();
     setIsCreateModalOpen(false);
     router.push("/leads", { scroll: false });
   };
@@ -289,99 +316,84 @@ export default function LeadsPage() {
   const handleUpdateLeadStatus = async (leadId: string, newStatus: string) => {
     try {
       console.log(`🔄 Updating lead ${leadId} to status ${newStatus}`);
-      
       const response = await updateLeadStatus(parseInt(leadId), { status: newStatus });
-      
+
       if (response.success) {
         console.log('✅ Lead status updated in backend');
-        // Update local state immediately (optimistic update)
-        setLeads(prevLeads => 
-          prevLeads.map(lead => 
-            lead.id === leadId 
-              ? { ...lead, stage: newStatus } 
-              : lead
+        setLeads(prevLeads =>
+          prevLeads.map(lead =>
+            lead.id === leadId ? { ...lead, stage: newStatus } : lead
           )
         );
       }
     } catch (error) {
       console.error("❌ Error updating lead status:", error);
-      // Revert optimistic update on error
-      await fetchLeadsData();
+      await fetchAllData();
     }
   };
 
-  // ✅ ARCHIVE LEAD (Update Backend) - FIX: Actually call backend
+  // ✅ ARCHIVE LEAD (Update Backend)
   const handleArchiveLead = async (leadId: string) => {
     try {
       console.log(`📦 Archiving lead ${leadId}`);
-      
-      // Call backend API to update isArchived field
       const { updateLead } = await import("@/services/leadService");
       await updateLead(parseInt(leadId), { isArchived: true });
-      
-      // Update local state after backend success
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          lead.id === leadId 
-            ? { ...lead, isArchived: true } 
-            : lead
+
+      setLeads(prevLeads =>
+        prevLeads.map(lead =>
+          lead.id === leadId ? { ...lead, isArchived: true } : lead
         )
       );
-
       console.log('✅ Lead archived and saved to backend');
     } catch (error) {
       console.error("❌ Error archiving lead:", error);
-      await fetchLeadsData(); // Revert on error
+      await fetchAllData();
     }
   };
 
-  // ✅ RESTORE LEAD (Update Backend) - FIX: Actually call backend
+  // ✅ RESTORE LEAD (Update Backend)
   const handleRestoreLead = async (leadId: string) => {
     try {
       console.log(`♻️ Restoring lead ${leadId}`);
-      
-      // Call backend API to update isArchived field
       const { updateLead } = await import("@/services/leadService");
       await updateLead(parseInt(leadId), { isArchived: false });
-      
-      // Update local state after backend success
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          lead.id === leadId 
-            ? { ...lead, isArchived: false } 
-            : lead
+
+      setLeads(prevLeads =>
+        prevLeads.map(lead =>
+          lead.id === leadId ? { ...lead, isArchived: false } : lead
         )
       );
-
       console.log('✅ Lead restored and saved to backend');
     } catch (error) {
       console.error("❌ Error restoring lead:", error);
-      await fetchLeadsData(); // Revert on error
+      await fetchAllData();
     }
   };
 
-  // ✅ DELETE LEAD (Permanent)
   const handleDeleteLead = async (leadId: string) => {
-    try {
-      console.log(`🗑️ Deleting lead ${leadId}`);
-      
-      await deleteLead(parseInt(leadId));
-      
-      // Remove from local state
-      setLeads(prevLeads => prevLeads.filter(lead => lead.id !== leadId));
-      
-      console.log('✅ Lead deleted');
-    } catch (error) {
-      console.error("❌ Error deleting lead:", error);
+  try {
+    const numericId = parseInt(leadId);
+    if (isNaN(numericId)) return;
+
+    console.log(`🗑️ API Call: Deleting lead ${numericId}`);
+    const response = await deleteLead(numericId);
+
+    if (response.success) {
+      showToast("Lead deleted successfully");
     }
-  };
+  } catch (error: any) {
+    console.error("❌ Delete API Failed:", error);
+    // Jika error 500 karena data sudah tidak ada, jangan buat UI crash
+    if (error.response?.status !== 404) {
+       await fetchAllData(); // Ambil ulang data asli dari server jika gagal parah
+    }
+  }
+};
 
   // ✅ VIEW TOGGLE with Archive handling
   const handleViewToggle = (view: "list" | "grid" | "kanban" | "archive") => {
     if (view === "archive") {
-      // Toggle archive mode, keep current base view (kanban/list)
       setIsArchiveMode(true);
-      // Keep currentView as is (kanban or list)
     } else {
       setCurrentView(view);
       setIsArchiveMode(false);
@@ -390,36 +402,31 @@ export default function LeadsPage() {
 
   const handleArchiveToggle = (show: boolean) => {
     setIsArchiveMode(show);
-    // Don't change currentView, just toggle archive mode
   };
 
   const handleAddLead = () => router.push("/leads?modal=add", { scroll: false });
-  
+
   const handleEditLead = (leadId: string) => {
     setSelectedLeadId(leadId);
     setCurrentView("detail");
   };
-  
+
   const handleBackToLeads = () => {
     setSelectedLeadId(null);
     setCurrentView("kanban");
-    fetchLeadsData();
+    fetchAllData();
   };
 
-  // ✅ HANDLE LEADS CHANGE (from child components) - FIX: Actually save to backend
+  // ✅ HANDLE LEADS CHANGE (from child components)
   const handleLeadsChange = async (updatedLeads: Lead[]) => {
     console.log('🔄 handleLeadsChange triggered');
-    
-    // Compare with current state to find changes
+
     const changes: Array<{leadId: string, change: 'stage' | 'archive' | 'restore' | 'won' | 'lost' | 'delete'}> = [];
-    
+
     updatedLeads.forEach((updatedLead) => {
       const originalLead = leads.find(l => l.id === updatedLead.id);
-      
       if (originalLead) {
-        // Detect stage change (Drag & Drop)
         if (updatedLead.stage !== originalLead.stage) {
-          // Check if it's a special stage (WON, LOST)
           if (updatedLead.stage === 'WON') {
             changes.push({ leadId: updatedLead.id, change: 'won' });
           } else if (updatedLead.stage === 'LOST') {
@@ -428,8 +435,7 @@ export default function LeadsPage() {
             changes.push({ leadId: updatedLead.id, change: 'stage' });
           }
         }
-        
-        // Detect archive/restore
+
         if (updatedLead.isArchived !== originalLead.isArchived) {
           if (updatedLead.isArchived) {
             changes.push({ leadId: updatedLead.id, change: 'archive' });
@@ -440,7 +446,6 @@ export default function LeadsPage() {
       }
     });
 
-    // Check for deleted leads
     leads.forEach((originalLead) => {
       const stillExists = updatedLeads.find(l => l.id === originalLead.id);
       if (!stillExists) {
@@ -449,14 +454,10 @@ export default function LeadsPage() {
     });
 
     console.log('📋 Detected changes:', changes);
-
-    // Update local state immediately (optimistic update)
     setLeads(updatedLeads);
 
-    // Process each change and update backend
     for (const change of changes) {
       const updatedLead = updatedLeads.find(l => l.id === change.leadId);
-
       try {
         if (change.change === 'stage') {
           if (!updatedLead) continue;
@@ -480,8 +481,7 @@ export default function LeadsPage() {
         }
       } catch (error) {
         console.error(`❌ Error processing change for lead ${change.leadId}:`, error);
-        // Revert on error
-        await fetchLeadsData();
+        await fetchAllData();
         return;
       }
     }
@@ -492,136 +492,142 @@ export default function LeadsPage() {
   // Scroll Sync Logic
   useEffect(() => {
     if (currentView !== "kanban" || isArchiveMode) return;
+
     const topScroll = document.getElementById("top-scroll");
     const real = document.getElementById("real-scroll");
     if (!topScroll || !real) return;
 
-    const onTopScroll = () => { real.scrollLeft = topScroll.scrollLeft; };
-    const onRealScroll = () => { topScroll.scrollLeft = real.scrollLeft; };
+    const onTopScroll = () => {
+      real.scrollLeft = topScroll.scrollLeft;
+    };
+
+    const onRealScroll = () => {
+      topScroll.scrollLeft = real.scrollLeft;
+    };
 
     topScroll.addEventListener("scroll", onTopScroll, { passive: true });
     real.addEventListener("scroll", onRealScroll, { passive: true });
+
     return () => {
       topScroll.removeEventListener("scroll", onTopScroll);
       real.removeEventListener("scroll", onRealScroll);
     };
   }, [currentView, isArchiveMode]);
 
-  // LEAD MANAGEMENT VIEW
-  if (currentView === "detail" && selectedLeadId) {
-    return <LeadManagement leadId={selectedLeadId} onBack={handleBackToLeads} />;
-  }
+  const renderMainContent = () => {
+    // 1. DETAIL VIEW (Dahulukan ini)
+    if (currentView === "detail" && selectedLeadId) {
+      return <LeadManagement leadId={selectedLeadId} onBack={handleBackToLeads} />;
+    }
+
+    // 2. KANBAN VIEW (Normal & Archive)
+    if (currentView === "kanban") {
+      return (
+        <div className="h-full flex flex-col">
+          {/* Scroll Sync Container */}
+          <div id="top-scroll" className="overflow-x-auto h-0 invisible">
+             <div style={{ width: '2000px', height: '1px' }}></div>
+          </div>
+          
+          <div className="flex-1 overflow-hidden">
+            <KanbanBoard
+              ref={boardRef}
+              leads={filteredLeads}
+              isArchiveMode={isArchiveMode} // Pastikan prop ini dikirim!
+              onLeadsChange={handleLeadsChange}
+              onAddLead={handleAddLead}
+              onEditLead={handleEditLead}
+              filters={filters}
+              setFilters={setFilters}
+              onClearFilter={handleClearFilter}
+              onArchiveSuccess={fetchAllData}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // 3. LIST VIEW
+    if (currentView === "list") {
+      return (
+        <div className="h-full overflow-auto px-6 py-4">
+          {isArchiveMode ? (
+            <LeadsArchiveView
+              leads={filteredLeads}
+              onLeadsChange={handleLeadsChange}
+            />
+          ) : (
+            <LeadsListView
+              leads={filteredLeads}
+              onEditLead={handleEditLead}
+              onLeadsChange={handleLeadsChange}
+            />
+          )}
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   // LOADING STATE
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#F0F2F5]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-[#5A4FB0]/20 border-t-[#5A4FB0] rounded-full animate-spin" />
-          <p className="text-sm font-medium text-gray-500">Loading Leads...</p>
+      <div className="flex items-center justify-center min-h-screen bg-[#F0F2F5]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5A4FB0] mx-auto mb-4"></div>
+          <p className="text-gray-600 font-bold">Loading Leads Board...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col">
-      {/* HEADER */}
-      <div ref={headerRef} className="sticky top-0 z-40 bg-[#F0F2F5]">
-        <div className="border-b border-gray-200">
-          <Topbar onToggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+ return (
+  <div className="flex flex-col h-screen bg-[#F0F2F5] overflow-hidden">
+    
+    {/* TOPBAR */}
+    <Topbar onToggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+
+    {/* AREA KONTEN YANG BISA DI-SCROLL */}
+    <main className="flex-1 overflow-y-auto relative custom-scrollbar">
+      
+      {/* NOTIFIKASI: Sekarang kita pakai 'sticky' supaya dia nempel di atas Search Bar saat di-scroll */}
+      {toastMessage && (
+        <div className="sticky top-2 z-[90] w-full flex justify-center pointer-events-none">
+          <div className="pointer-events-auto bg-[#257047] text-white px-6 py-2 rounded-full shadow-xl flex items-center gap-2 animate-in slide-in-from-top-4 duration-300 border border-white/20">
+            <span className="font-bold text-xs">✓ {toastMessage}</span>
+          </div>
         </div>
-        <div className="px-5">
+      )}
+
+      {/* HEADER (Isinya Judul Leads & Filter) */}
+      {currentView !== "detail" && (
+        <div className="px-6 pt-2"> 
           <LeadsHeader
+            currentView={currentView}
             onViewToggle={handleViewToggle}
             onArchiveToggle={handleArchiveToggle}
             onAddLead={handleAddLead}
             onFilterClick={() => boardRef.current?.openFilter()}
             activeFilterCount={activeFilterCount}
             isArchiveMode={isArchiveMode}
-            currentView={currentView as any}
           />
         </div>
+      )}
+
+      {/* BOARD / LIST CONTENT */}
+      <div className="px-6 pb-10">
+        {renderMainContent()}
       </div>
+    </main>
 
-      {/* CONTENT */}
-      <div className="flex-1 min-h-0 overflow-hidden pt-1">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          
-          {/* KANBAN VIEW - Normal */}
-          {currentView === "kanban" && !isArchiveMode && (
-            <div className="h-full">
-              <KanbanBoard 
-                ref={boardRef}
-                isArchiveMode={false}
-                onArchiveSuccess={() => {}}
-                leads={filteredLeads}
-                onLeadsChange={handleLeadsChange}
-                onAddLead={handleAddLead}
-                onEditLead={handleEditLead}
-                filters={filters} 
-                setFilters={setFilters} 
-                onClearFilter={handleClearFilter} 
-              />
-            </div>
-          )}
-
-          {/* KANBAN VIEW - Archive Mode */}
-          {currentView === "kanban" && isArchiveMode && (
-            <div className="h-full">
-              <KanbanBoard 
-                ref={boardRef}
-                isArchiveMode={true}
-                onArchiveSuccess={() => {}}
-                leads={filteredLeads}  
-                onLeadsChange={handleLeadsChange}
-                onAddLead={handleAddLead}
-                onEditLead={handleEditLead}
-                filters={filters} 
-                setFilters={setFilters}  
-                onClearFilter={handleClearFilter}  
-              />
-            </div>
-          )}
-
-          {/* LIST VIEW - Normal */}
-          {currentView === "list" && !isArchiveMode && (
-            <div className="h-full px-4">
-              <LeadsListView 
-                leads={filteredLeads}  
-                onLeadsChange={handleLeadsChange}
-                isArchiveMode={false}
-                viewMode="list"
-                onEditLead={handleEditLead}
-              />
-            </div>
-          )}
-
-          {/* LIST VIEW - Archive Mode */}
-          {currentView === "list" && isArchiveMode && (
-            <div className="h-full px-4">
-              <LeadsListView 
-                leads={filteredLeads} 
-                onLeadsChange={handleLeadsChange}
-                isArchiveMode={true}
-                viewMode="list"
-                onEditLead={handleEditLead}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* CREATE LEAD MODAL */}
-        <CreateLeadModal
-          isOpen={isCreateModalOpen}
-          onClose={() => {
-            router.push("/leads", { scroll: false });
-          }}
-          onSubmit={handleCreateLeadSubmit}
-        />
-        
-          
-      </div>
-    </div>
-  );
-}
+    {/* 4. MODALS (Di luar flow) */}
+    {isCreateModalOpen && (
+      <CreateLeadModal
+        isOpen={isCreateModalOpen}
+        onClose={() => router.push("/leads", { scroll: false })}
+        onSubmit={handleCreateLeadSubmit}
+      />
+    )}
+  </div>
+);}

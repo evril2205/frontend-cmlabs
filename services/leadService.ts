@@ -19,6 +19,37 @@ export const createLead = async (leadData: CreateLeadRequest): Promise<ApiRespon
   }
 };
 
+
+export const addNote = async (leadId: number, noteData: { title: string; content: string }) => {
+  try {
+    // Validasi sederhana sebelum kirim
+    if (!leadId) throw new Error("Lead ID is required");
+
+    const response = await api.post(`/leads/${leadId}/notes`, {
+      title: noteData.title || "Untitled Note",
+      content: noteData.content,
+    });
+    return response.data;
+  } catch (error: any) {
+    // Biar ketahuan errornya kenapa di console
+    console.error("Detail Error Backend:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * Mengambil semua catatan berdasarkan leadId
+ */
+export const getNotesByLead = async (leadId: number) => {
+  try {
+    const response = await api.get(`/leads/${leadId}/notes`);
+    return response.data; // Biasanya ini berisi array of notes
+  } catch (error: any) {
+    console.error('Error fetching notes:', error);
+    throw error.response?.data || error.message;
+  }
+};
+
 /**
  * GET ALL LEADS
  * Endpoint: GET /api/leads
@@ -109,41 +140,16 @@ export const updateLead = async (
  */
 export const deleteLead = async (id: number): Promise<ApiResponse<null>> => {
   try {
+    // Gunakan template literal untuk memastikan URL benar
     const response = await api.delete(`/leads/${id}`);
     return response.data;
   } catch (error: any) {
-    console.error('Error deleting lead:', error);
-    throw {
-      success: false,
-      message: error.response?.data?.message || 'Failed to delete lead',
-      error: error.response?.data?.error || error.message,
-    };
+    // Log error lebih detail untuk debugging
+    console.error('API Delete Error:', error.response?.data || error.message);
+    throw error; // Lempar balik agar ditangkap oleh catch di component
   }
 };
-
-// ============================================
-// NOTES SERVICES (untuk Lead Timeline)
-// ============================================
-
-export const addNote = async (leadId: number, noteData: { title?: string; content: string }) => {
-  try {
-    const response = await api.post(`/leads/${leadId}/notes`, noteData);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error adding note:', error);
-    throw error.response?.data || error.message;
-  }
-};
-
-export const getNotesByLead = async (leadId: number) => {
-  try {
-    const response = await api.get(`/leads/${leadId}/notes`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching notes:', error);
-    throw error.response?.data || error.message;
-  }
-};
+ 
 
 // ============================================
 // MEETINGS SERVICES
@@ -282,10 +288,8 @@ export const updateLeadStatusSequential = async (
     return response.data;
   } catch (error: any) {
     console.error('Error updating lead status sequential:', error);
-    throw {
-      success: false,
-      message: error.response?.data?.message || 'Failed to update lead status',
-      error: error.response?.data?.error || error.message,
-    };
+    // JANGAN buat objek baru di sini jika ingin menangkap err.response di komponen
+    // Cukup throw error aslinya agar AxiosError object tetap utuh
+    throw error; 
   }
 };

@@ -110,10 +110,10 @@ export default function EditSourceModal({ open, onClose, onSave, initialData }: 
               <label className="block mb-1 font-medium text-gray-700">Source ID</label>
               <input
                 type="text"
-                value={sourceId}
+                value={sourceId} disabled
                 onChange={(e) => setSourceId(e.target.value)} // Mengupdate state saat diketik
                 placeholder="Ex: @username or campaign-123"
-                className="w-full h-10 px-3 rounded-md border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-[#5A4FB0] focus:border-[#5A4FB0] placeholder:text-gray-400"
+                className="w-full h-10 px-3 rounded-md border read-only border-gray-300 text-sm text-gray-900 bg-gray-100 focus:outline-none focus:ring-1 focus:ring-[#5A4FB0] focus:border-[#5A4FB0] placeholder:text-gray-400"
               />
             </div>
 

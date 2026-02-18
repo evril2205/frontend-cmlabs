@@ -320,8 +320,8 @@ export default function ModalCreateTeam({
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch("http://localhost:5000/api/profile/admins", {
-      headers: { Authorization: `Bearer ${token}` },
+    fetch("http://localhost:5000/api/profile/admins", { 
+  headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then(setAdmins)
@@ -342,7 +342,7 @@ export default function ModalCreateTeam({
       };
 
       const res = await fetch("http://localhost:5000/api/profile/", {
-        method: "POST",
+  method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,

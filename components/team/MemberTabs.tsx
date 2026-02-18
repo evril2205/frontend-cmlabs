@@ -79,7 +79,11 @@ export default function MemberTabs({ member }: Props) {
         </div>
       )}
 
-      {activeTab === "leads" && <LeadsContent />}
+      {activeTab === "leads" && <LeadsContent member={member} onEdit={function (): void {
+        throw new Error("Function not implemented.");
+      } } onDelete={function (): void {
+        throw new Error("Function not implemented.");
+      } } />}
       {activeTab === "performance" && <p>Coming soon...</p>}
     </div>
   );

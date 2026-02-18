@@ -8,6 +8,7 @@ import {
   TrashIcon,
   PencilSquareIcon,
 } from "@heroicons/react/24/solid";
+import { JSX } from "react";
 
 interface Props {
   m: {
@@ -16,6 +17,7 @@ interface Props {
     email?: string;
     role?: string;
     status?: { name: string };
+     profilePicture?: string;
     department?: { name: string };
    joinedDate ?: string;
   };
