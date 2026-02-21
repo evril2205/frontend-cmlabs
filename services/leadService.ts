@@ -293,3 +293,7 @@ export const updateLeadStatusSequential = async (
     throw error; 
   }
 };
+export const deleteNote = async (noteId: number) => {
+  const response = await api.delete(`/notes/${noteId}`);
+  return response.data;
+};

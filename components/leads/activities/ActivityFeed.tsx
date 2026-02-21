@@ -1,365 +1,312 @@
 "use client";
 
-import React, { useState } from 'react';
-import AddNoteModal from '@/components/modals/AddNoteModal';
-import AddMeetingModal from '@/components/modals/AddMeetingModal';
-
-import FilterNoteModal from '../activities/FilterNoteModal';
-import FilterMeetingModal from '@/components/modals/FilterMeetingModal';
-import FilterEmailModal from '@/components/modals/FilterEmailModal';
-import FilterCallModal from '@/components/modals/FilterCallModal';
-import FilterInvoiceModal from '@/components/modals/FilterInvoiceModal';
-
-import { 
-  MagnifyingGlassIcon, 
-  PlusIcon,
-} from '@heroicons/react/24/outline';
-import { 
-  DocumentTextIcon as DocumentTextSolid,
-  PencilSquareIcon as PencilSolid,
-  TrashIcon as TrashSolid,
-  CalendarIcon as CalendarSolid,
-  FunnelIcon as FunnelSolid,
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  MagnifyingGlassIcon,
   ChevronDownIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  DocumentIcon
-} from '@heroicons/react/24/solid';
-import AddCallModal from '@/components/modals/AddCallModal';
+  PlusIcon,
+} from "@heroicons/react/24/outline";
+import {
+  DocumentTextIcon,
+  CalendarIcon,
+  FunnelIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/solid";
+
+import AddNoteModal from "@/components/modals/AddNoteModal";
+import AddCallModal from "@/components/modals/AddCallModal";
+import AddMeetingModal from "@/components/modals/AddMeetingModal";
+import FilterModal, { FilterState } from "./FilterNoteModal";
+
+import { addNote, getNotesByLead, deleteNote } from "@/services/leadService";
 
 interface ActivityFeedProps {
-  activities?: any[];
-  meetings?: any[];
-  emails?: any[];
-  calls?: any[];
-  invoices?: any[];
-  leadData?: any;
-  onAddNote?: () => void;
-  onAddMeeting?: () => void;
-  openActivityId?: number | null;
-  toggleActivity?: (id: number) => void;
-  onEditNote?: (id: number) => void;
-  onDeleteNote?: (id: number) => void;
+  leadId: string;
 }
 
-export default function ActivityFeed({ 
-  activities = [], 
-  meetings = [],
-  emails = [],
-  calls = [],
-  invoices = [],
-  leadData,
-  onAddNote,
-  onAddMeeting,
-  openActivityId,
-  toggleActivity,
-  onEditNote, 
-  onDeleteNote, 
-}: ActivityFeedProps) {
-  const [activeTab, setActiveTab] = useState("All Activity");
-  const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
-  const [isAddMeetingOpen, setIsAddMeetingOpen] = useState(false);
-  const [isAddEmailOpen, setIsAddEmailOpen] = useState(false);
-  const [isAddCallOpen, setIsAddCallOpen] = useState(false);
-  const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false);
+export default function ActivityFeed({ leadId }: ActivityFeedProps) {
+  const [activeTab, setActiveTab] = useState("Notes");
 
-  const [isFilterNoteOpen, setIsFilterNoteOpen] = useState(false);
-  const [isFilterMeetingOpen, setIsFilterMeetingOpen] = useState(false);
-  const [isFilterEmailOpen, setIsFilterEmailOpen] = useState(false);
-  const [isFilterCallOpen, setIsFilterCallOpen] = useState(false);
-  const [isFilterInvoiceOpen, setIsFilterInvoiceOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<any | null>(null);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedNotes, setExpandedNotes] = useState<number[]>([]);
+  const [loadingDelete, setLoadingDelete] = useState<number | null>(null);
+  const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
+  const [isAddCallOpen, setIsAddCallOpen] = useState(false);
+  const [isAddMeetingOpen, setIsAddMeetingOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const [filters, setFilters] = useState<FilterState | null>(null);
+
+  // =========================
+  // FETCH NOTES
+  // =========================
+  useEffect(() => {
+    if (!leadId) return;
+
+    const fetchNotes = async () => {
+      try {
+        const data = await getNotesByLead(Number(leadId));
+        setNotes(data);
+      } catch (err) {
+        console.error("Fetch notes error:", err);
+      }
+    };
+
+    fetchNotes();
+  }, [leadId]);
+
+  const toggleNote = (id: number) => {
+  setExpandedNotes((prev) =>
+    prev.includes(id)
+      ? prev.filter((n) => n !== id)
+      : [...prev, id]
+  );
+};
+
+  // =========================
+  // ADD CLICK LOGIC
+  // =========================
+  const handleAddClick = () => {
+    if (activeTab === "Notes") setIsAddNoteOpen(true);
+    if (activeTab === "Call") setIsAddCallOpen(true);
+    if (activeTab === "Meeting") setIsAddMeetingOpen(true);
+  };
+
+  // =========================
+  // SAVE NOTE
+  // =========================
+  const handleSaveNote = async (data: any) => {
+  try {
+    if (editingNote) {
+      await updateNote(editingNote.id, data);
+    } else {
+      await addNote(Number(leadId), data);
+    }
+
+    const updated = await getNotesByLead(Number(leadId));
+    setNotes(updated);
+
+    setEditingNote(null);
+    setIsAddNoteOpen(false);
+  } catch (err) {
+    console.error("Save note failed:", err);
+  }
+};
+
+
+  // =========================
+  // FILTER + SEARCH
+  // =========================
+  const filteredNotes = useMemo(() => {
+    let result = [...notes];
+
+    if (searchQuery) {
+      result = result.filter(
+        (n) =>
+          n.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          n.content?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return result;
+  }, [notes, searchQuery, filters]);
 
   const tabs = [
-    { name: "All Activity", action: "Activity", count: 0 },
-    { name: "Notes", action: "Note", count: activities.length || 0 },
-    { name: "Meeting", action: "Meeting", count: meetings.length || 0 },
-    { name: "Call", action: "Call", count: calls.length || 0 },
-    { name: "E-mail", action: "Email", count: emails.length || 0 },
-    { name: "Invoice", action: "Invoice", count: invoices.length || 0 },
+    "All Activity",
+    "Notes",
+    "Meeting",
+    "Call",
+    "E-mail",
+    "Invoice",
   ];
 
-  const currentTabInfo = tabs.find(t => t.name === activeTab);
-
-  // Filter berdasarkan tab aktif
-  const filteredActivities = activeTab === "All Activity" 
-    ? [...activities, ...meetings, ...emails, ...calls, ...invoices]
-    : activeTab === "Notes"
-    ? activities
-    : activeTab === "Meeting"
-    ? meetings
-    : activeTab === "E-mail"
-    ? emails
-    : activeTab === "Call"
-    ? calls
-    : activeTab === "Invoice"
-    ? invoices
-    : [];
-
-  // Icon mapping
-  const getIcon = (type: string) => {
-    switch(type) {
-      case 'note': return <DocumentTextSolid className="w-4 h-4 text-white" />;
-      case 'meeting': return <CalendarSolid className="w-4 h-4 text-white" />;
-      case 'email': return <EnvelopeIcon className="w-4 h-4 text-white" />;
-      case 'call': return <PhoneIcon className="w-4 h-4 text-white" />;
-      case 'invoice': return <DocumentIcon className="w-4 h-4 text-white" />;
-      default: return <DocumentTextSolid className="w-4 h-4 text-white" />;
-    }
-  };
-
-  // Handle Add Button
-  const handleAddClick = () => {
-    switch(activeTab) {
-      case "Notes":
-        if (onAddNote) onAddNote();
-        else setIsAddNoteOpen(true);
-        break;
-      case "Meeting":
-        if (onAddMeeting) onAddMeeting();
-        else setIsAddMeetingOpen(true);
-        break;
-      case "E-mail":
-        setIsAddEmailOpen(true);
-        break;
-      case "Call":
-        setIsAddCallOpen(true);
-        break;
-      case "Invoice":
-        setIsAddInvoiceOpen(true);
-        break;
-    }
-  };
-
-  // Handle Filter Button
-  const handleFilterClick = () => {
-    switch(activeTab) {
-      case "Notes":
-        setIsFilterNoteOpen(true);
-        break;
-      case "Meeting":
-        setIsFilterMeetingOpen(true);
-        break;
-      case "E-mail":
-        setIsFilterEmailOpen(true);
-        break;
-      case "Call":
-        setIsFilterCallOpen(true);
-        break;
-      case "Invoice":
-        setIsFilterInvoiceOpen(true);
-        break;
-    }
-  };
-
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col h-[85vh] overflow-hidden">
-      
-      {/* 1. SEARCH BAR */}
-      <div className="p-3 border-b border-gray-100">
+    <div className="bg-white rounded-2xl border shadow-sm flex flex-col h-[85vh] overflow-hidden">
+
+      {/* SEARCH */}
+      <div className="p-3 border-b">
         <div className="relative">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search activity, notes, email and more..."
-            className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+          <input
+            type="text"
+            placeholder="Search activity..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-1.5 bg-gray-50 border rounded-full text-xs"
           />
         </div>
       </div>
 
-      {/* 2. TAB MENU */}
-      <div className="bg-white border-b border-gray-200">
+      {/* TABS */}
+      <div className="border-b">
         <div className="flex px-2 justify-between">
           {tabs.map((tab) => (
             <button
-              key={tab.name}
-              onClick={() => setActiveTab(tab.name)}
-              className={`relative flex items-center gap-1 px-3 py-3 text-[12px] font-bold transition-all ${
-                activeTab === tab.name ? "text-gray-900" : "text-gray-400"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`relative px-3 py-3 text-[12px] font-bold ${
+                activeTab === tab ? "text-gray-900" : "text-gray-400"
               }`}
             >
-              {tab.name}
-              {tab.count > 0 && (
-                <span className="bg-red-600 text-white text-[9px] px-1 rounded shadow-sm">{tab.count}</span>
+              {tab}
+              {activeTab === tab && (
+                <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#5A4FB0]" />
               )}
-              {activeTab === tab.name && <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#5A4FB0]" />}
             </button>
           ))}
         </div>
       </div>
 
-      {/* 3. ACTION AREA (Filter & Add) - HANYA MUNCUL JIKA BUKAN "All Activity" */}
+      {/* ACTION */}
       {activeTab !== "All Activity" && (
         <div className="p-3 flex items-center gap-2">
-          <button 
-            onClick={handleFilterClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-xl text-gray-600 text-xs font-bold hover:bg-gray-50 transition-all"
-          >
-            <FunnelSolid className="w-4 h-4 text-gray-500" />
-            Filters
-            <ChevronDownIcon className="w-3 h-3" />
-          </button>
+          <button
+  onClick={() => setIsFilterOpen(true)}
+  className="flex items-center gap-1 px-3 py-1.5 border rounded-xl text-xs font-medium text-gray-500"
+>
+  <FunnelIcon className="w-4 h-4 text-gray-500" />
+  Filters 
+  <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+</button>
 
-          <button 
+
+          <button
+            type="button"
             onClick={handleAddClick}
-            className="flex items-center gap-1 bg-[#5A4FB0] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md hover:bg-[#483f94] transition-all"
+            className="flex items-center gap-1 bg-[#5A4FB0] text-white px-3 py-1.5 rounded-xl text-xs font-sm"
           >
-            <PlusIcon className="w-4 h-4 stroke-[3px]" />
-            Add {currentTabInfo?.action}
+            <PlusIcon className="w-4 h-4" />
+            Add Note
           </button>
         </div>
       )}
 
-      {/* 4. ACTIVITY LIST */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-[#F8F9FB]">
-        {filteredActivities.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <DocumentTextSolid className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No {activeTab.toLowerCase()} yet</p>
-          </div>
-        ) : (
-          filteredActivities.map((activity: any) => (
-            <div key={activity.id} className="border border-gray-200 rounded-xl bg-white overflow-hidden shadow-sm">
-              {/* Header Card */}
-              <div className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => toggleActivity && toggleActivity(activity.id)}
-                    className="hover:bg-gray-100 rounded-full p-1 transition-colors"
-                  >
-                    <ChevronDownIcon 
-                      className={`w-4 h-4 text-gray-400 transition-transform ${
-                        openActivityId === activity.id ? 'rotate-180' : ''
-                      }`} 
-                    />
-                  </button>
-                  <div className="w-8 h-8 rounded-lg bg-[#5A4FB0] flex items-center justify-center">
-                    {getIcon(activity.type || 'note')}
-                  </div>
-                  <span className="font-bold text-gray-900 text-[13px]">
-                    {activity.author || activity.organizer || 'User'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-gray-500 font-bold text-[11px]">
-                    <CalendarSolid className="w-3.5 h-3.5 text-gray-400" />
-                    {activity.date || new Date(activity.createdAt).toLocaleDateString()}
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex gap-1">
-                    {onEditNote && (
-                      <button 
-                        onClick={() => onEditNote(activity.id)}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        <PencilSolid className="w-3.5 h-3.5 text-gray-500" />
-                      </button>
-                    )}
-                    {onDeleteNote && (
-                      <button 
-                        onClick={() => onDeleteNote(activity.id)}
-                        className="p-1 hover:bg-red-50 rounded transition-colors"
-                      >
-                        <TrashSolid className="w-3.5 h-3.5 text-red-500" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+      {/* LIST */}
+<div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50">
+  {activeTab === "Notes" &&
+    filteredNotes.map((note) => {
+      const isOpen = expandedNotes.includes(note.id);
+
+      return (
+        <div
+          key={note.id}
+          className="border rounded-xl bg-white shadow-sm overflow-hidden"
+        >
+          {/* HEADER */}
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-3">
+              <button onClick={() => toggleNote(note.id)}>
+                  <ChevronDownIcon
+                    className={`w-4 h-4 text-gray-400 transition-transform ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+              {/* ICON */}
+              <div className="w-8 h-8 bg-[#5A4FB0] rounded-lg flex items-center justify-center text-white">
+                <DocumentTextIcon className="w-4 h-4" />
               </div>
 
-              <div className="h-[2px] w-full bg-[#5A4FB5]"></div>
+              {/* TITLE + CHEVRON */}
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[13px]">
+                  {note.title || "Untitled"}
+                </span>
 
-              {/* Content */}
-              {openActivityId === activity.id && (
-                <div className="p-4 text-[13px] text-gray-600 leading-relaxed">
-                  {activity.title && (
-                    <h4 className="font-bold text-gray-900 mb-2">{activity.title}</h4>
-                  )}
-                  {activity.content || activity.description || 'No content available'}
-                </div>
-              )}
+                
+              </div>
             </div>
-          ))
-        )}
-      </div>
 
-      {/* ADD MODALS */}
-<AddNoteModal 
-  isOpen={isAddNoteOpen} 
-  onClose={() => setIsAddNoteOpen(false)} 
-  onSave={(data: any) => { // <--- Tambahkan : any di sini biar gak error 7006
-    console.log('Save note:', data);
+            {/* RIGHT SIDE */}
+            <div className="flex items-center gap-2 text-gray-400">
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-bold">
+                {new Date(note.createdAt).toLocaleDateString()}
+              </span>
+
+              <span className="mx-2 text-gray-300">|</span>
+
+              {/* EDIT */}
+              <PencilSquareIcon
+  className="w-4 h-4 text-[#8AB500] cursor-pointer"
+  onClick={() => {
+    setEditingNote(note);
+    setIsAddNoteOpen(true);
+  }}
+/>
+
+
+              {/* DELETE */}
+              <TrashIcon
+                className="w-4 h-4 text-[#FF0E00] cursor-pointer hover:opacity-80"
+                onClick={async () => {
+                  if (!confirm("Delete this note?")) return;
+
+                  try {
+                    setLoadingDelete(note.id);
+                    await deleteNote(note.id); // <-- connect backend
+                    const updated = await getNotesByLead(Number(leadId));
+                    setNotes(updated);
+                  } catch (err) {
+                    console.error(err);
+                  } finally {
+                    setLoadingDelete(null);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="h-[2px] bg-[#5A4FB5]" />
+
+          {/* DESCRIPTION */}
+          {isOpen && (
+            <div
+              className="px-4 py-4 text-[13px] text-gray-600 prose max-w-none"
+              dangerouslySetInnerHTML={{ __html: note.content }}
+            />
+          )}
+        </div>
+      );
+    })}
+</div>
+
+      {/* MODALS */}
+
+     {isAddNoteOpen && (
+  <AddNoteModal
+  isOpen={isAddNoteOpen}
+  onClose={() => {
     setIsAddNoteOpen(false);
+    setEditingNote(null);
   }}
+  onSave={handleSaveNote}
+  initialData={editingNote}
 />
-
-<AddMeetingModal 
-  isOpen={isAddMeetingOpen} 
-  onClose={() => setIsAddMeetingOpen(false)} 
-  onSave={(data: any) => {
-    console.log('Save meeting:', data);
-    setIsAddMeetingOpen(false);
-  }}
-/>
-
-<AddCallModal 
-  open={isAddCallOpen}  
-  onClose={() => setIsAddCallOpen(false)} 
-  onSave={(data: any) => {
-    console.log('Save call:', data);
-    setIsAddCallOpen(false);
-  }}
-  // leadData sekarang sudah dikenal karena sudah dimasukkan di props atas
-  contactName={leadData?.contactPerson || "Unknown Contact"} 
-/>
-
-{/* Pastikan AddEmailModal & AddInvoiceModal juga sudah di-import di paling atas */}
-
-
-
-      {/* FILTER MODALS */}
-      <FilterNoteModal 
-        open={isFilterNoteOpen} 
-        onClose={() => setIsFilterNoteOpen(false)} 
-        onApply={(filters) => {
-          console.log('Apply note filters:', filters);
-          setIsFilterNoteOpen(false);
-        }}
+     )}
+      <AddCallModal
+        open={isAddCallOpen}
+        onClose={() => setIsAddCallOpen(false)}
+        onSave={() => setIsAddCallOpen(false)}
+        contactName="Contact"
       />
 
-      <FilterMeetingModal 
-        open={isFilterMeetingOpen} 
-        onClose={() => setIsFilterMeetingOpen(false)} 
-        onApply={(filters) => {
-          console.log('Apply meeting filters:', filters);
-          setIsFilterMeetingOpen(false);
-        }}
+      <AddMeetingModal
+        open={isAddMeetingOpen}
+        onClose={() => setIsAddMeetingOpen(false)}
+        onSave={() => setIsAddMeetingOpen(false)}
       />
 
-      <FilterEmailModal 
-        open={isFilterEmailOpen} 
-        onClose={() => setIsFilterEmailOpen(false)} 
-        onApply={(filters) => {
-          console.log('Apply email filters:', filters);
-          setIsFilterEmailOpen(false);
-        }}
-      />
-
-      <FilterCallModal 
-        open={isFilterCallOpen} 
-        onClose={() => setIsFilterCallOpen(false)} 
-        onApply={(filters) => {
-          console.log('Apply call filters:', filters);
-          setIsFilterCallOpen(false);
-        }}
-      />
-
-      <FilterInvoiceModal 
-        open={isFilterInvoiceOpen} 
-        onClose={() => setIsFilterInvoiceOpen(false)} 
-        onApply={(filters) => {
-          console.log('Apply invoice filters:', filters);
-          setIsFilterInvoiceOpen(false);
+      <FilterModal
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        onApply={(f) => {
+          setFilters(f);
+          setIsFilterOpen(false);
         }}
       />
     </div>

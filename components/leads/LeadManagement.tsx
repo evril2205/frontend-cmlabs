@@ -17,7 +17,6 @@ import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   ChevronDownIcon,
-  CalendarIcon,
   UserCircleIcon,
   PhoneIcon,
   EnvelopeIcon,
@@ -46,15 +45,11 @@ import { User as LucideUser, ChevronDown as LucideChevronDown, Search as LucideS
 
 // modal / komponen internal
 import ActivityFeed from './activities/ActivityFeed';
-import Topbar from '@/components/topbar/Topbar';
 import { useSidebar } from '@/contexts/SidebarContext';
 import EditLeadSummaryModal from '@/components/modals/EditLeadSummaryModal';
 import EditPersonModal from '@/components/modals/EditPersonModal';
 import EditCompanyDetailModal from '@/components/modals/EditCompanyDetailModal';
 import EditSourceModal from '@/components/modals/EditSourceModal';
-import AddNoteModal from '@/components/modals/AddNoteModal';
-import AddMeetingModal from '@/components/modals/AddMeetingModal';
-import AddCallModal from '@/components/modals/AddCallModal';
 import { 
   getLeadById, 
   getLeadTimeline, 
@@ -213,6 +208,10 @@ export default function LeadManagement({ leadId, onBack }: LeadManagementProps):
     teamMembers: [],
   });
   
+const [emails, setEmails] = useState<any[]>([]);
+const [calls, setCalls] = useState<any[]>([]);
+const [invoices, setInvoices] = useState<any[]>([]);
+
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
   const [isAddCallOpen, setIsAddCallOpen] = useState(false);
   const handleSaveCall = (data: any) => {
@@ -231,6 +230,7 @@ const [showLeaveModal, setShowLeaveModal] = useState(false);
   }
 };
   const [search, setSearch] = useState("");
+  
   const [activities, setActivities] = useState<Activity[]>([]);
   const [openActivityId, setOpenActivityId] = useState<number | null>(null);
   const [openEditSummary, setOpenEditSummary] = useState(false);
@@ -660,15 +660,6 @@ const handleDeleteLead = async () => {
   const toggleActivity = (id: number) => {
     setOpenActivityId((prev) => (prev === id ? null : id));
   };
-
-  const tabs = [
-    { name: "All Activity", count: 0 },
-    { name: "Notes", count: 1 },
-    { name: "Meeting", count: 1 },
-    { name: "Call", count: 1 },
-    { name: "E-mail", count: 1 },
-    { name: "Invoice", count: 1 },
-  ];
 
   return (
     <div className="relative flex flex-col min-h-screen bg-[#F0F2F5]">
@@ -1229,43 +1220,21 @@ const handleDeleteLead = async () => {
                   </div>
 
                   {/* RIGHT COLUMN */}
-                  <div className="col-span-2">
-                    <ActivityFeed 
-                      activities={activities}
-                      meetings={meetings}
-                      onAddNote={() => setIsAddNoteOpen(true)}
-                      onAddMeeting={() => setIsAddMeetingOpen(true)}
-                      openActivityId={openActivityId}
-                      toggleActivity={toggleActivity}
-                    />
-                  </div>
+                 {/* RIGHT COLUMN */}
+<div className="col-span-2 h-full">
+ <ActivityFeed leadId={leadId} />
+</div>
+
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-
-
-        <AddNoteModal 
-          isOpen={isAddNoteOpen} 
-          onClose={() => setIsAddNoteOpen(false)} 
-          onSave={handleSaveNote} 
-        />
-        <AddMeetingModal 
-        open={isAddMeetingOpen}
-        onClose={() => setIsAddMeetingOpen(false)}
-        onSave={handleSaveMeeting} onApply={() => {}}          
-        />
-        <AddCallModal 
-  open={isAddCallOpen} 
-  onClose={() => setIsAddCallOpen(false)} 
-  onSave={handleSaveCall} 
-  contactName={leadData?.contactPerson || "Unknown Contact"} 
-/>
       </div>
   );
 }
+
 
 /* ================== COMPONENT KECIL ================== */
 

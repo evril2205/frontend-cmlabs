@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { FunnelIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import React, { useState } from 'react';
+import { XMarkIcon, FunnelIcon } from '@heroicons/react/24/solid';
 
 export interface FilterState {
   date: string;
@@ -10,105 +10,188 @@ export interface FilterState {
   attachment: string;
 }
 
-interface FilterNoteModalProps {
-  open: boolean;
+interface FilterModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onApply: (filters: FilterState) => void;
 }
 
 export default function FilterNoteModal({
-  open,
+  isOpen,
   onClose,
   onApply,
-}: FilterNoteModalProps) {
-  // ✅ INTERNAL STATE (yang tadi hilang → bikin merah)
+}: FilterModalProps) {
   const [filters, setFilters] = useState<FilterState>({
-    date: "All",
-    creator: "All",
-    update: "Recently Updated",
-    attachment: "All",
+    date: '',
+    creator: 'All',
+    update: '',
+    attachment: 'All',
   });
 
-  // ✅ jangan render kalau tidak open
-  if (!open) return null;
+  const setValue = (key: keyof FilterState, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
-  const sections: { title: string; key: keyof FilterState; options: string[] }[] = [
-    { title: "Date", key: "date", options: ["Today", "This Week", "This Month", "Last 3 Months"] },
-    { title: "Creator", key: "creator", options: ["Created by Me", "Created by Others", "All"] },
-    { title: "Update", key: "update", options: ["Recently Updated", "Oldest First"] },
-    { title: "Attachment", key: "attachment", options: ["Has Attachment", "No Attachment", "All"] },
-  ];
+  const handleClear = () => {
+    setFilters({
+      date: '',
+      creator: 'All',
+      update: '',
+      attachment: 'All',
+    });
+  };
+
+  if (!isOpen) return null;
 
   return (
     <>
-      {/* OVERLAY */}
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[150]"
+        className="fixed inset-0 bg-black/30 z-40"
         onClick={onClose}
       />
 
-      {/* MODAL */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[160] w-[375px] bg-white rounded-3xl shadow-md p-6 border border-gray-100 animate-in fade-in zoom-in duration-200">
-        
-        {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <FunnelIcon className="w-5 h-5 text-[#5A4FB0]" />
-            <h3 className="text-lg font-bold text-gray-900">Filter</h3>
+      {/* Modal */}
+      <div
+        className="fixed z-50 w-full max-w-2xl bg-white rounded-2xl shadow-2xl
+        top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b flex justify-between items-center">
+          <div className="flex gap-2 items-center">
+            <FunnelIcon className="w-5 h-5 text-[#5A4FB5]" />
+            <h3 className="font-bold text-gray-900">Filter Notes</h3>
           </div>
-
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <XMarkIcon className="w-5 h-5" />
+          <button onClick={onClose}>
+            <XMarkIcon className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        {/* SECTIONS */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-6">
-          {sections.map((section) => (
-            <div key={section.title}>
-              <h4 className="font-bold text-[12px] tracking-wider text-black mb-3">
-                {section.title}
-              </h4>
+        {/* Content */}
+        <div className="p-6 max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-2 gap-10">
 
-              <div className="space-y-2">
-                {section.options.map((opt) => (
-                  <label key={opt} className="flex items-center gap-3 cursor-pointer group">
-                    <div className="relative flex items-center justify-center">
+            {/* LEFT COLUMN */}
+            <div className="space-y-6">
+
+              {/* Date */}
+              <div>
+                <h4 className="font-semibold mb-3 text-sm">Date</h4>
+                <div className="space-y-2 text-sm">
+                  {['Today', 'This Week', 'This Month', 'Last 3 Months'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
-                        name={section.key}
-                        checked={filters[section.key] === opt}
-                        onChange={() =>
-                          setFilters({ ...filters, [section.key]: opt })
-                        }
-                        className="peer appearance-none w-5 h-5 border-2 border-gray-300 rounded-full checked:border-[#5A4FB0]"
+                        name="date"
+                        checked={filters.date === opt}
+                        onChange={() => setValue('date', opt)}
+                        className="
+  w-4 h-4 
+  text-[#5A4FB5] 
+  border-gray-300 
+  focus:ring-0 
+  focus:ring-offset-0
+  accent-[#5A4FB5]
+"
                       />
-
-                      <div className="absolute w-2.5 h-2.5 bg-[#5A4FB0] rounded-full scale-0 peer-checked:scale-100 transition-transform" />
-                    </div>
-
-                    <span className="text-[12px] text-gray-600 group-hover:text-gray-900">
                       {opt}
-                    </span>
-                  </label>
-                ))}
+                    </label>
+                  ))}
+                </div>
               </div>
+
+              {/* Update */}
+              <div>
+                <h4 className="font-semibold mb-3 text-sm">Update</h4>
+                <div className="space-y-2 text-sm">
+                  {['Recently Updated', 'Oldest First'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="update"
+                        checked={filters.update === opt}
+                        onChange={() => setValue('update', opt)}
+                        className="
+  w-4 h-4 
+  text-[#5A4FB5] 
+  border-gray-300 
+  focus:ring-0 
+  focus:ring-offset-0
+  accent-[#5A4FB5]
+"
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
             </div>
-          ))}
+
+            {/* RIGHT COLUMN */}
+            <div className="space-y-2">
+
+              {/* Creator */}
+              <div>
+                <h4 className="font-semibold mb-3 text-sm">Creator</h4>
+                <div className="space-y-2 text-sm">
+                  {['Created by Me', 'Created by Others', 'All'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="creator"
+                        checked={filters.creator === opt}
+                        onChange={() => setValue('creator', opt)}
+                        className="
+  w-4 h-4 
+  text-[#5A4FB5] 
+  border-gray-300 
+  focus:ring-0 
+  focus:ring-offset-0
+  accent-[#5A4FB5]
+"
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Attachment */}
+              <div>
+                <h4 className="font-semibold mb-3 text-sm">Attachment</h4>
+                <div className="space-y-2 text-sm">
+                  {['Has Attachment', 'No Attachment', 'All'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="attachment"
+                        checked={filters.attachment === opt}
+                        onChange={() => setValue('attachment', opt)}
+                        className="
+  w-4 h-4 
+  text-[#5A4FB5] 
+  border-gray-300 
+  focus:ring-0 
+  focus:ring-offset-0
+  accent-[#5A4FB5]
+"
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
 
-        {/* BUTTONS */}
-        <div className="flex justify-end gap-3 mt-8">
+        {/* Footer */}
+        <div className="p-5 border-t flex justify-end gap-3">
           <button
-            onClick={() =>
-              setFilters({
-                date: "All",
-                creator: "All",
-                update: "Recently Updated",
-                attachment: "All",
-              })
-            }
-            className="flex-1 py-2.5 border border-[#5A4FB5] text-[#5A4FB5] rounded-full text-sm font-semibold hover:bg-gray-50"
+            onClick={handleClear}
+            className="px-6 py-2 rounded-full border border-[#5A4FB5] text-[#5A4FB5] font-medium text-sm"
           >
             Clear
           </button>
@@ -118,7 +201,7 @@ export default function FilterNoteModal({
               onApply(filters);
               onClose();
             }}
-            className="flex-1 py-2.5 bg-[#5A4FB0] text-white rounded-full text-sm font-semibold hover:opacity-90 shadow-md"
+            className="px-6 py-2 rounded-full bg-[#5A4FB5] text-white font-medium text-sm"
           >
             Apply
           </button>
